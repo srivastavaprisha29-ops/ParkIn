@@ -45,3 +45,26 @@ test("a host can add a spot on a narrow viewport", async ({ page }) => {
   await expect(page.locator("#results").getByRole("heading", { name: "HSR Test Bay" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("checkout explains an overlap and accepts a back-to-back slot", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2028-01-01T03:30:00Z"));
+  await page.goto("http://127.0.0.1:8000");
+  const reserve = page.getByRole("button", { name: "Reserve Metro-side covered bay (demo)" });
+  const form = page.locator("#reservation");
+  const arrival = form.getByLabel("Arrival time (Bengaluru, IST)");
+  const confirm = form.getByRole("button", { name: "Confirm demo reservation" });
+  await reserve.click();
+  await arrival.fill("2028-01-01T10:00");
+  await confirm.click();
+  await expect(form).toBeHidden();
+
+  await reserve.click();
+  await arrival.fill("2028-01-01T10:30");
+  await expect(page.locator("#slot-status")).toContainText("overlaps");
+  await expect(confirm).toBeDisabled();
+  await arrival.fill("2028-01-01T11:00");
+  await expect(page.locator("#slot-status")).toContainText(/Available in this demo until.*IST/);
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  await expect(page.locator("#reservations article")).toHaveCount(2);
+});

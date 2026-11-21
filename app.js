@@ -15,6 +15,9 @@ const reservation = document.querySelector("#reservation");
 const reservationCards = document.querySelector("#reservations");
 const reservationFeedback = document.querySelector("#reservation-feedback");
 const quote = document.querySelector("#quote");
+const slotStatus = document.querySelector("#slot-status");
+const confirmBooking = reservation.querySelector("button");
+let savingReservation = false;
 let selectedSpot = null;
 const filters = document.querySelector("#filters");
 const listing = document.querySelector("#listing");
@@ -78,8 +81,21 @@ function reservationHours() {
   return Number(new FormData(reservation).get("hours"));
 }
 
+function bookingIssue(spot, start, hours) {
+  if (!Number.isFinite(start) || start <= Date.now()) return "Choose a future arrival time in Bengaluru.";
+  if (![1, 2, 3, 4].includes(hours)) return "Choose a parking duration of one to four hours.";
+  if (hasOverlap(loadReservations(), spot, start, hours)) return "This time overlaps a saved reservation for this spot.";
+  return null;
+}
+
 function updateQuote() {
-  quote.textContent = "Estimated total: " + money.format(selectedSpot.price * reservationHours());
+  if (!selectedSpot) return;
+  const hours = reservationHours();
+  const start = parseArrival(reservation.elements.namedItem("arrival").value);
+  const issue = bookingIssue(selectedSpot, start, hours);
+  quote.textContent = "Estimated total: " + money.format(selectedSpot.price * hours);
+  slotStatus.textContent = issue || "Available in this demo until " + dateTime.format(start + hours * hourMs) + " IST.";
+  confirmBooking.disabled = savingReservation || Boolean(issue);
 }
 
 function selectSpot(spot, slot) {
@@ -133,6 +149,7 @@ async function cancelReservation(id) {
     });
     renderReservations();
     if (filters.elements.namedItem("arrival").value) render();
+    updateQuote();
     announceReservation("Demo reservation cancelled.");
   } catch {
     announceReservation("Your browser could not cancel this reservation.");
@@ -223,20 +240,21 @@ listing.addEventListener("submit", event => {
   render();
   feedback.textContent = "Listing saved. You can find it in Browse parking above.";
 });
-reservation.addEventListener("change", updateQuote);
+reservation.addEventListener("input", updateQuote);
 reservation.addEventListener("submit", async event => {
   event.preventDefault();
   const spot = selectedSpot;
   const hours = reservationHours();
   const start = parseArrival(reservation.elements.namedItem("arrival").value);
   if (!spot || ![1, 2, 3, 4].includes(hours)) return;
-  const submit = reservation.querySelector("button");
-  submit.disabled = true;
+  if (savingReservation) return;
+  savingReservation = true;
+  updateQuote();
   try {
     const message = await updateSavedReservations(() => {
-      if (!Number.isFinite(start) || start <= Date.now()) return "Choose a future arrival time in Bengaluru.";
+      const issue = bookingIssue(spot, start, hours);
+      if (issue) return issue;
       const entries = loadReservations();
-      if (hasOverlap(entries, spot, start, hours)) return "You already have an overlapping demo reservation for this spot.";
       localStorage.setItem(reservationKey, JSON.stringify([{ id: crypto.randomUUID(), spot, hours, start }, ...entries]));
       return null;
     });
@@ -254,12 +272,16 @@ reservation.addEventListener("submit", async event => {
   } catch {
     announceReservation("Your browser could not save this reservation.");
   } finally {
-    submit.disabled = false;
+    savingReservation = false;
+    updateQuote();
   }
 });
 window.addEventListener("storage", event => {
   if (event.key === storageKey || event.key === reservationKey || event.key === null) render();
-  if (event.key === reservationKey || event.key === null) renderReservations();
+  if (event.key === reservationKey || event.key === null) {
+    renderReservations();
+    updateQuote();
+  }
 });
 render();
 renderReservations();
