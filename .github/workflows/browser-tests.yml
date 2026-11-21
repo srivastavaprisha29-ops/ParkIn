@@ -2,7 +2,7 @@ name: Browser tests
 on:
   pull_request:
   push:
-    branches: [main, parkin-prototype]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -15,5 +15,11 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - run: npx playwright install --with-deps chromium
+      - name: Set up Chromium
+        run: |
+          if command -v google-chrome >/dev/null; then
+            echo "PARKIN_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install chromium
+          fi
       - run: npm test
