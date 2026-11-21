@@ -1,3 +1,15 @@
+# ParkIn
+
+ParkIn is a parking discovery and listing prototype for Bengaluru. The runnable version in this branch includes fictional sample listings, search filters, and a form that saves listings in your browser.
+
+## Run the prototype
+
+From the repository root, run `python3 -m http.server 8000` and open [localhost:8000](http://localhost:8000). See [the prototype guide](PROTOTYPE.md) for a walkthrough.
+
+## Original project concept
+
+The description and stack below describe the original Rocket concept.
+
 <div align="center">
 
 <!-- ANIMATED HERO BANNER -->
