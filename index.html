@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ParkIn · Bengaluru Parking</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<header><a class="brand" href="./">Park<span>In</span></a><a href="#list">List a spot</a></header>
+<main>
+  <section class="intro">
+    <p class="location">Bengaluru, India</p>
+    <h1>Find your<br>parking spot.</h1>
+    <p>Browse demo listings by neighbourhood, vehicle and hourly rate.</p>
+  </section>
+  <section class="panel" aria-labelledby="browse">
+    <h2 id="browse">Browse parking</h2>
+    <form id="filters" class="fields">
+      <label>Neighbourhood or listing<input name="query" type="search" placeholder="e.g. Indiranagar"></label>
+      <label>Vehicle<select name="vehicle"><option value="">Any vehicle</option><option>Car</option><option>Two-wheeler</option></select></label>
+      <label>Maximum ₹ per hour<input name="max" type="number" min="0" step="1" placeholder="Any price"></label>
+      <label>Filter by arrival (IST)<input name="arrival" type="datetime-local" aria-describedby="availability-note"></label>
+      <label>Parking duration<select name="hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select></label>
+    </form>
+    <p id="availability-note">Choose an arrival to check availability against demo bookings saved in this browser. Clear the arrival to browse all spots.</p>
+    <p id="count" role="status"></p>
+    <div id="results" class="cards"></div>
+  </section>
+  <section class="panel" id="reserve" aria-labelledby="reserve-title">
+    <h2 id="reserve-title">Demo reservations</h2>
+    <p>Reservations are saved in this browser as a demo. Availability reflects this browser’s demo reservations only. No parking space is held and no payment is collected.</p>
+    <form id="reservation" hidden>
+      <h3 id="selected-spot"></h3>
+      <label>Arrival time (Bengaluru, IST)<input name="arrival" type="datetime-local" required></label>
+      <label>Duration<select name="hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select></label>
+      <p id="quote" aria-live="polite"></p>
+      <p id="slot-status" role="status"></p>
+      <button type="submit">Confirm demo reservation</button>
+    </form>
+    <p id="reservation-feedback" role="status"></p>
+    <div id="reservations" class="cards"></div>
+  </section>
+  <section class="panel" id="list" aria-labelledby="host">
+    <h2 id="host">List a spot</h2>
+    <p>Listings you add are saved in this browser.</p>
+    <form id="listing">
+      <div class="fields">
+        <label>Listing name<input name="name" required maxlength="80"></label>
+        <label>Neighbourhood<input name="area" required maxlength="60"></label>
+        <label>Vehicle<select name="vehicle"><option>Car</option><option>Two-wheeler</option></select></label>
+        <label>Hourly rate (₹)<input name="price" type="number" min="0" max="10000" step="1" required></label>
+      </div>
+      <button type="submit">Add listing</button>
+    </form>
+    <p id="feedback" role="status"></p>
+  </section>
+</main>
+<footer>ParkIn · Parking discovery prototype</footer>
+</body>
+</html>
