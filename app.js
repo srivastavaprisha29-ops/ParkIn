@@ -5,6 +5,11 @@ const samples = [
 ];
 
 const storageKey = "parkin.listings.v1";
+const hourMs = 3600000;
+const istOffsetMs = 330 * 60000;
+const dateTime = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short",
+});
 const reservationKey = "parkin.reservations.v1";
 const reservation = document.querySelector("#reservation");
 const reservationCards = document.querySelector("#reservations");
@@ -44,6 +49,31 @@ function loadReservations() {
   );
 }
 
+function istInput(timestamp) {
+  return new Date(timestamp + istOffsetMs).toISOString().slice(0, 16);
+}
+
+function parseArrival(value) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return NaN;
+  const timestamp = Date.parse(value + ":00+05:30");
+  return Number.isFinite(timestamp) && istInput(timestamp) === value ? timestamp : NaN;
+}
+
+function spotKey(spot) {
+  return spot.id || JSON.stringify([spot.name, spot.area, spot.vehicle, spot.price]);
+}
+
+function hasOverlap(entries, spot, start, hours) {
+  return entries.some(entry => spotKey(entry.spot) === spotKey(spot)
+    && start < entry.start + entry.hours * hourMs
+    && entry.start < start + hours * hourMs);
+}
+
+function updateSavedReservations(update) {
+  if (navigator.locks) return navigator.locks.request(reservationKey, update);
+  return Promise.resolve().then(update);
+}
+
 function reservationHours() {
   return Number(new FormData(reservation).get("hours"));
 }
@@ -59,23 +89,58 @@ function selectSpot(spot) {
   title.textContent = spot.name + " · " + spot.area;
   reservationFeedback.textContent = "";
   reservation.hidden = false;
+  const arrival = reservation.elements.namedItem("arrival");
+  const interval = 15 * 60000;
+  arrival.min = istInput(Math.ceil((Date.now() + 1) / 60000) * 60000);
+  arrival.value = istInput(Math.ceil((Date.now() + 1) / interval) * interval);
   updateQuote();
   document.querySelector("#reserve").scrollIntoView({ block: "start" });
-  reservation.elements.namedItem("hours").focus({ preventScroll: true });
+  arrival.focus({ preventScroll: true });
 }
 
 function renderReservations() {
-  const entries = loadReservations().map(({ spot, hours }) => {
+  const entries = loadReservations().map(({ spot, hours, start, id }) => {
     const card = document.createElement("article");
     const title = document.createElement("h3");
     const detail = document.createElement("p");
     title.textContent = spot.name;
     detail.textContent = spot.area + " · " + hours + (hours === 1 ? " hour" : " hours")
       + " · " + money.format(spot.price * hours);
-    card.append(title, detail);
+    const timing = document.createElement("p");
+    timing.textContent = Number.isFinite(start)
+      ? dateTime.format(start) + " to " + dateTime.format(start + hours * hourMs) + " IST"
+      : "Saved before scheduling was available";
+    card.append(title, detail, timing);
+    if (id && start >= Date.now()) {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel reservation";
+      cancel.setAttribute("aria-label", "Cancel reservation for " + spot.name + " at " + dateTime.format(start));
+      cancel.addEventListener("click", () => cancelReservation(id));
+      card.append(cancel);
+    }
     return card;
   });
   reservationCards.replaceChildren(...entries);
+}
+
+async function cancelReservation(id) {
+  try {
+    await updateSavedReservations(() => {
+      const entries = loadReservations();
+      localStorage.setItem(reservationKey, JSON.stringify(entries.filter(entry => entry.id !== id)));
+    });
+    renderReservations();
+    announceReservation("Demo reservation cancelled.");
+  } catch {
+    announceReservation("Your browser could not cancel this reservation.");
+  }
+}
+
+function announceReservation(message) {
+  reservationFeedback.textContent = message;
+  reservationFeedback.tabIndex = -1;
+  reservationFeedback.focus();
 }
 
 function makeCard(spot, source) {
@@ -123,6 +188,7 @@ listing.addEventListener("submit", event => {
   event.preventDefault();
   const values = new FormData(listing);
   const spot = {
+    id: crypto.randomUUID(),
     name: values.get("name").trim(),
     area: values.get("area").trim(),
     vehicle: values.get("vehicle"),
@@ -144,23 +210,37 @@ listing.addEventListener("submit", event => {
   feedback.textContent = "Listing saved. You can find it in Browse parking above.";
 });
 reservation.addEventListener("change", updateQuote);
-reservation.addEventListener("submit", event => {
+reservation.addEventListener("submit", async event => {
   event.preventDefault();
+  const spot = selectedSpot;
   const hours = reservationHours();
-  if (!selectedSpot || ![1, 2, 3, 4].includes(hours)) return;
+  const start = parseArrival(reservation.elements.namedItem("arrival").value);
+  if (!spot || ![1, 2, 3, 4].includes(hours)) return;
+  const submit = reservation.querySelector("button");
+  submit.disabled = true;
   try {
-    const entries = [{ spot: selectedSpot, hours }, ...loadReservations()];
-    localStorage.setItem(reservationKey, JSON.stringify(entries));
+    const message = await updateSavedReservations(() => {
+      if (!Number.isFinite(start) || start <= Date.now()) return "Choose a future arrival time in Bengaluru.";
+      const entries = loadReservations();
+      if (hasOverlap(entries, spot, start, hours)) return "You already have an overlapping demo reservation for this spot.";
+      localStorage.setItem(reservationKey, JSON.stringify([{ id: crypto.randomUUID(), spot, hours, start }, ...entries]));
+      return null;
+    });
+    if (message) {
+      announceReservation(message);
+      return;
+    }
+    if (selectedSpot === spot) {
+      selectedSpot = null;
+      reservation.hidden = true;
+    }
+    renderReservations();
+    announceReservation("Demo reservation saved on this device.");
   } catch {
-    reservationFeedback.textContent = "Your browser could not save this reservation.";
-    return;
+    announceReservation("Your browser could not save this reservation.");
+  } finally {
+    submit.disabled = false;
   }
-  selectedSpot = null;
-  reservation.hidden = true;
-  renderReservations();
-  reservationFeedback.textContent = "Demo reservation saved on this device.";
-  reservationFeedback.tabIndex = -1;
-  reservationFeedback.focus();
 });
 window.addEventListener("storage", event => {
   if (event.key === storageKey || event.key === null) render();
