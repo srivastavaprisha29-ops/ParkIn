@@ -25,6 +25,18 @@
     <p id="count" role="status"></p>
     <div id="results" class="cards"></div>
   </section>
+  <section class="panel" id="reserve" aria-labelledby="reserve-title">
+    <h2 id="reserve-title">Demo reservations</h2>
+    <p>Reservations are saved in this browser as a demo. No parking space is held and no payment is collected.</p>
+    <form id="reservation" hidden>
+      <h3 id="selected-spot"></h3>
+      <label>Duration<select name="hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select></label>
+      <p id="quote"></p>
+      <button type="submit">Confirm demo reservation</button>
+    </form>
+    <p id="reservation-feedback" role="status"></p>
+    <div id="reservations" class="cards"></div>
+  </section>
   <section class="panel" id="list" aria-labelledby="host">
     <h2 id="host">List a spot</h2>
     <p>Listings you add are saved in this browser.</p>

@@ -5,6 +5,12 @@ const samples = [
 ];
 
 const storageKey = "parkin.listings.v1";
+const reservationKey = "parkin.reservations.v1";
+const reservation = document.querySelector("#reservation");
+const reservationCards = document.querySelector("#reservations");
+const reservationFeedback = document.querySelector("#reservation-feedback");
+const quote = document.querySelector("#quote");
+let selectedSpot = null;
 const filters = document.querySelector("#filters");
 const listing = document.querySelector("#listing");
 const results = document.querySelector("#results");
@@ -19,13 +25,57 @@ function isValidSpot(spot) {
     && Number.isInteger(spot.price) && spot.price >= 0 && spot.price <= 10000);
 }
 
-function loadListings() {
+function loadEntries(key, isValid) {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    return Array.isArray(saved) ? saved.filter(isValidSpot) : [];
+    const saved = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(saved) ? saved.filter(isValid) : [];
   } catch {
     return [];
   }
+}
+
+function loadListings() {
+  return loadEntries(storageKey, isValidSpot);
+}
+
+function loadReservations() {
+  return loadEntries(reservationKey, entry =>
+    entry && isValidSpot(entry.spot) && [1, 2, 3, 4].includes(entry.hours)
+  );
+}
+
+function reservationHours() {
+  return Number(new FormData(reservation).get("hours"));
+}
+
+function updateQuote() {
+  quote.textContent = "Estimated total: " + money.format(selectedSpot.price * reservationHours());
+}
+
+function selectSpot(spot) {
+  selectedSpot = spot;
+  reservation.reset();
+  const title = document.querySelector("#selected-spot");
+  title.textContent = spot.name + " · " + spot.area;
+  reservationFeedback.textContent = "";
+  reservation.hidden = false;
+  updateQuote();
+  document.querySelector("#reserve").scrollIntoView({ block: "start" });
+  reservation.elements.namedItem("hours").focus({ preventScroll: true });
+}
+
+function renderReservations() {
+  const entries = loadReservations().map(({ spot, hours }) => {
+    const card = document.createElement("article");
+    const title = document.createElement("h3");
+    const detail = document.createElement("p");
+    title.textContent = spot.name;
+    detail.textContent = spot.area + " · " + hours + (hours === 1 ? " hour" : " hours")
+      + " · " + money.format(spot.price * hours);
+    card.append(title, detail);
+    return card;
+  });
+  reservationCards.replaceChildren(...entries);
 }
 
 function makeCard(spot, source) {
@@ -38,7 +88,12 @@ function makeCard(spot, source) {
   detail.textContent = spot.area + " · " + spot.vehicle;
   rate.textContent = money.format(spot.price) + " / hour";
   label.textContent = source;
-  card.append(title, detail, rate, label);
+  const reserve = document.createElement("button");
+  reserve.type = "button";
+  reserve.textContent = "Reserve (demo)";
+  reserve.setAttribute("aria-label", "Reserve " + spot.name + " (demo)");
+  reserve.addEventListener("click", () => selectSpot(spot));
+  card.append(title, detail, rate, label, reserve);
   return card;
 }
 
@@ -88,7 +143,28 @@ listing.addEventListener("submit", event => {
   render();
   feedback.textContent = "Listing saved. You can find it in Browse parking above.";
 });
+reservation.addEventListener("change", updateQuote);
+reservation.addEventListener("submit", event => {
+  event.preventDefault();
+  const hours = reservationHours();
+  if (!selectedSpot || ![1, 2, 3, 4].includes(hours)) return;
+  try {
+    const entries = [{ spot: selectedSpot, hours }, ...loadReservations()];
+    localStorage.setItem(reservationKey, JSON.stringify(entries));
+  } catch {
+    reservationFeedback.textContent = "Your browser could not save this reservation.";
+    return;
+  }
+  selectedSpot = null;
+  reservation.hidden = true;
+  renderReservations();
+  reservationFeedback.textContent = "Demo reservation saved on this device.";
+  reservationFeedback.tabIndex = -1;
+  reservationFeedback.focus();
+});
 window.addEventListener("storage", event => {
   if (event.key === storageKey || event.key === null) render();
+  if (event.key === reservationKey || event.key === null) renderReservations();
 });
 render();
+renderReservations();
