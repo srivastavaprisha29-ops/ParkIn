@@ -21,7 +21,10 @@
       <label>Neighbourhood or listing<input name="query" type="search" placeholder="e.g. Indiranagar"></label>
       <label>Vehicle<select name="vehicle"><option value="">Any vehicle</option><option>Car</option><option>Two-wheeler</option></select></label>
       <label>Maximum ₹ per hour<input name="max" type="number" min="0" step="1" placeholder="Any price"></label>
+      <label>Filter by arrival (IST)<input name="arrival" type="datetime-local" aria-describedby="availability-note"></label>
+      <label>Parking duration<select name="hours"><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></select></label>
     </form>
+    <p id="availability-note">Choose an arrival to check availability against demo bookings saved in this browser. Clear the arrival to browse all spots.</p>
     <p id="count" role="status"></p>
     <div id="results" class="cards"></div>
   </section>

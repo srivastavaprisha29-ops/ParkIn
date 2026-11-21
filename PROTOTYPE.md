@@ -7,3 +7,5 @@ Browse the sample Bengaluru listings by name, neighbourhood, vehicle and hourly 
 Choose **Reserve (demo)** on a listing, select an arrival time in Bengaluru (IST) and a duration, and confirm to save the quote and reservation on this device. Reload to see the reservation persist. Overlapping reservations for the same spot are blocked on this browser, and cancelling an upcoming reservation frees its time in the demo. Older reservations remain visible without a scheduled time.
 
 The sample spots are fictional. Demo reservations have no effect on availability and do not collect payment. This version has browser-local storage. Shared inventory, accounts, real reservations and payments would require additional app and server work.
+
+To check availability before booking, set **Filter by arrival (IST)** and **Parking duration**. The results exclude overlapping reservations in this browser and carry the chosen slot into checkout. Clear the arrival field to see all matching spots again.

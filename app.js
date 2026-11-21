@@ -82,7 +82,7 @@ function updateQuote() {
   quote.textContent = "Estimated total: " + money.format(selectedSpot.price * reservationHours());
 }
 
-function selectSpot(spot) {
+function selectSpot(spot, slot) {
   selectedSpot = spot;
   reservation.reset();
   const title = document.querySelector("#selected-spot");
@@ -92,7 +92,8 @@ function selectSpot(spot) {
   const arrival = reservation.elements.namedItem("arrival");
   const interval = 15 * 60000;
   arrival.min = istInput(Math.ceil((Date.now() + 1) / 60000) * 60000);
-  arrival.value = istInput(Math.ceil((Date.now() + 1) / interval) * interval);
+  arrival.value = slot ? istInput(slot.start) : istInput(Math.ceil((Date.now() + 1) / interval) * interval);
+  if (slot) reservation.elements.namedItem("hours").value = String(slot.hours);
   updateQuote();
   document.querySelector("#reserve").scrollIntoView({ block: "start" });
   arrival.focus({ preventScroll: true });
@@ -131,6 +132,7 @@ async function cancelReservation(id) {
       localStorage.setItem(reservationKey, JSON.stringify(entries.filter(entry => entry.id !== id)));
     });
     renderReservations();
+    if (filters.elements.namedItem("arrival").value) render();
     announceReservation("Demo reservation cancelled.");
   } catch {
     announceReservation("Your browser could not cancel this reservation.");
@@ -143,7 +145,7 @@ function announceReservation(message) {
   reservationFeedback.focus();
 }
 
-function makeCard(spot, source) {
+function makeCard(spot, source, slot) {
   const card = document.createElement("article");
   const title = document.createElement("h3");
   const detail = document.createElement("p");
@@ -157,7 +159,7 @@ function makeCard(spot, source) {
   reserve.type = "button";
   reserve.textContent = "Reserve (demo)";
   reserve.setAttribute("aria-label", "Reserve " + spot.name + " (demo)");
-  reserve.addEventListener("click", () => selectSpot(spot));
+  reserve.addEventListener("click", () => selectSpot(spot, slot));
   card.append(title, detail, rate, label, reserve);
   return card;
 }
@@ -167,6 +169,17 @@ function render() {
   const query = values.get("query").trim().toLowerCase();
   const vehicle = values.get("vehicle");
   const max = values.get("max");
+  const arrivalInput = filters.elements.namedItem("arrival");
+  const arrival = values.get("arrival");
+  const start = parseArrival(arrival);
+  const hours = Number(values.get("hours"));
+  if (arrivalInput.validity.badInput || (arrival && (!Number.isFinite(start) || start <= Date.now()))) {
+    results.replaceChildren();
+    count.textContent = "Choose a future arrival in Bengaluru, or clear the arrival to browse all spots.";
+    return;
+  }
+  const slot = arrival ? { start, hours } : null;
+  const bookings = slot ? loadReservations() : [];
   const entries = [
     ...loadListings().map(spot => ({ spot, source: "Saved on this device" })),
     ...samples.map(spot => ({ spot, source: "Sample listing" })),
@@ -175,11 +188,12 @@ function render() {
     (spot.name + " " + spot.area).toLowerCase().includes(query)
     && (!vehicle || spot.vehicle === vehicle)
     && (max === "" || spot.price <= Number(max))
+    && (!slot || !hasOverlap(bookings, spot, slot.start, slot.hours))
   );
-  results.replaceChildren(...matches.map(({ spot, source }) => makeCard(spot, source)));
+  results.replaceChildren(...matches.map(({ spot, source }) => makeCard(spot, source, slot)));
   count.textContent = matches.length
-    ? matches.length + (matches.length === 1 ? " spot found" : " spots found")
-    : "No spots match your filters.";
+    ? matches.length + (matches.length === 1 ? " spot" : " spots") + (slot ? " available" : " found")
+    : slot ? "No spots match your filters for this time." : "No spots match your filters."
 }
 
 filters.addEventListener("input", render);
@@ -235,6 +249,7 @@ reservation.addEventListener("submit", async event => {
       reservation.hidden = true;
     }
     renderReservations();
+    if (filters.elements.namedItem("arrival").value) render();
     announceReservation("Demo reservation saved on this device.");
   } catch {
     announceReservation("Your browser could not save this reservation.");
@@ -243,7 +258,7 @@ reservation.addEventListener("submit", async event => {
   }
 });
 window.addEventListener("storage", event => {
-  if (event.key === storageKey || event.key === null) render();
+  if (event.key === storageKey || event.key === reservationKey || event.key === null) render();
   if (event.key === reservationKey || event.key === null) renderReservations();
 });
 render();
