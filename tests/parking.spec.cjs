@@ -30,6 +30,10 @@ test("a demo booking changes availability and cancellation restores it", async (
   await expect(count).toHaveText("No spots match your filters for this time.");
   await saved.getByRole("button", { name: /Cancel reservation for Metro-side covered bay/ }).click();
   await expect(count).toHaveText("1 spot available");
+  await expect(saved.getByText("Cancelled", { exact: true })).toBeVisible();
+  await expect(saved.getByRole("button", { name: /Cancel reservation for Metro-side covered bay/ })).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("#reservations").getByText("Cancelled", { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -67,4 +71,22 @@ test("checkout explains an overlap and accepts a back-to-back slot", async ({ pa
   await expect(confirm).toBeEnabled();
   await confirm.click();
   await expect(page.locator("#reservations article")).toHaveCount(2);
+});
+
+
+test("cancelled reservations do not block a new booking", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2028-01-01T03:30:00Z"));
+  await page.goto("http://127.0.0.1:8000");
+  const form = page.locator("#reservation");
+  await page.getByRole("button", { name: "Reserve Metro-side covered bay (demo)" }).click();
+  await form.getByLabel("Arrival time (Bengaluru, IST)").fill("2028-01-01T10:00");
+  await form.getByRole("button", { name: "Confirm demo reservation" }).click();
+  await page.locator("#reservations").getByRole("button", { name: /Cancel reservation for Metro-side covered bay/ }).click();
+  await page.getByRole("button", { name: "Reserve Metro-side covered bay (demo)" }).click();
+  await form.getByLabel("Arrival time (Bengaluru, IST)").fill("2028-01-01T10:00");
+  await expect(form.getByRole("button", { name: "Confirm demo reservation" })).toBeEnabled();
+  await form.getByRole("button", { name: "Confirm demo reservation" }).click();
+  await expect(page.locator("#reservations article")).toHaveCount(2);
+  await expect(page.locator("#reservations").getByText("Cancelled", { exact: true })).toHaveCount(1);
+  await expect(page.locator("#reservations").getByText("Reserved (demo)", { exact: true })).toHaveCount(1);
 });

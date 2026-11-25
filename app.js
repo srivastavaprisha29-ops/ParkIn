@@ -69,7 +69,8 @@ function spotKey(spot) {
 function hasOverlap(entries, spot, start, hours) {
   return entries.some(entry => spotKey(entry.spot) === spotKey(spot)
     && start < entry.start + entry.hours * hourMs
-    && entry.start < start + hours * hourMs);
+    && entry.start < start + hours * hourMs
+    && entry.status !== "cancelled");
 }
 
 function updateSavedReservations(update) {
@@ -116,7 +117,7 @@ function selectSpot(spot, slot) {
 }
 
 function renderReservations() {
-  const entries = loadReservations().map(({ spot, hours, start, id }) => {
+  const entries = loadReservations().map(({ spot, hours, start, id, status }) => {
     const card = document.createElement("article");
     const title = document.createElement("h3");
     const detail = document.createElement("p");
@@ -127,8 +128,10 @@ function renderReservations() {
     timing.textContent = Number.isFinite(start)
       ? dateTime.format(start) + " to " + dateTime.format(start + hours * hourMs) + " IST"
       : "Saved before scheduling was available";
-    card.append(title, detail, timing);
-    if (id && start >= Date.now()) {
+    const state = document.createElement("p");
+    state.textContent = status === "cancelled" ? "Cancelled" : Number.isFinite(start) && start + hours * hourMs <= Date.now() ? "Completed" : "Reserved (demo)";
+    card.append(title, detail, timing, state);
+    if (id && status !== "cancelled" && start >= Date.now()) {
       const cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "Cancel reservation";
@@ -145,7 +148,11 @@ async function cancelReservation(id) {
   try {
     await updateSavedReservations(() => {
       const entries = loadReservations();
-      localStorage.setItem(reservationKey, JSON.stringify(entries.filter(entry => entry.id !== id)));
+      const target = entries.find(entry => entry.id === id);
+      if (!target || target.status === "cancelled" || !Number.isFinite(target.start) || target.start < Date.now()) return;
+      localStorage.setItem(reservationKey, JSON.stringify(entries.map(entry =>
+        entry.id === id ? { ...entry, status: "cancelled", cancelledAt: Date.now() } : entry
+      )));
     });
     renderReservations();
     if (filters.elements.namedItem("arrival").value) render();
@@ -255,7 +262,7 @@ reservation.addEventListener("submit", async event => {
       const issue = bookingIssue(spot, start, hours);
       if (issue) return issue;
       const entries = loadReservations();
-      localStorage.setItem(reservationKey, JSON.stringify([{ id: crypto.randomUUID(), spot, hours, start }, ...entries]));
+      localStorage.setItem(reservationKey, JSON.stringify([{ id: crypto.randomUUID(), spot, hours, start, status: "reserved", createdAt: Date.now() }, ...entries]));
       return null;
     });
     if (message) {
